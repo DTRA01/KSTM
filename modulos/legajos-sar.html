@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEGAJOS CASOS SAR</title>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <style>
+        :root {
+            /* Cambio estético: Fondo principal claro para resaltar los paneles */
+            --bg-principal: #f1f5f9; 
+            --bg-contenedor: #141d2f; /* Las dos ventanas continúan en azul oscuro */
+            --bg-tarjeta: #1a2436;
+            --azul-institucional: #3a86ff;
+            --azul-operativo: #4ea8de;
+            --azul-hover: #2563eb;
+            --borde-color: #2c3b54;
+            --texto-titulo: #0f172a; /* Texto del título principal en oscuro */
+            --texto-principal: #f8fafc;
+            --texto-secundario: #94a3b8;
+            --exito: #10b981;
+            --alerta: #ef4444;
+            --advertencia: #f59e0b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-principal);
+            margin: 0;
+            padding: 25px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Título Principal fuera de las ventanas */
+        h1 {
+            color: var(--texto-titulo);
+            font-size: 26px;
+            margin: 0 0 20px 0;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* Diseño de Pantalla Partida en 2 Columnas */
+        .workspace {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* Columna Izquierda: Ventana Azul de Carga y Lista */
+        .panel-left {
+            flex: 1;
+            background-color: var(--bg-contenedor);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        /* Columna Derecha: Ventana Azul de Vista Previa */
+        .panel-right {
+            flex: 1;
+            background-color: var(--bg-contenedor);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--azul-operativo);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.75px;
+        }
+
+        /* ESTILOS DEL CHECKLIST DE COBERTURA */
+        .checklist-box {
+            background-color: var(--bg-tarjeta);
+            border: 1px solid var(--borde-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .checklist-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--azul-operativo);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .checklist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            font-size: 11px;
+        }
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--texto-secundario);
+            transition: all 0.3s ease;
+        }
+        .checklist-item.ready {
+            color: var(--exito);
+            font-weight: 600;
+        }
+        .chk-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--borde-color);
+            display: inline-block;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+        .checklist-item.ready .chk-indicator {
+            background-color: var(--exito);
+            box-shadow: 0 0 6px var(--exito);
+        }
+
+        /* Caja Única de Arrastre dentro de ventana azul */
+        .upload-box {
+            border: 2px dashed #3b82f6;
+            padding: 35px 20px;
+            border-radius: 8px;
+            text-align: center;
+            background-color: rgba(59, 130, 246, 0.04); 
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            margin-bottom: 20px;
+        }
+
+        .upload-box.dragover {
+            background-color: rgba(59, 130, 246, 0.15);
+            border-color: var(--texto-principal);
+        }
+
+        .upload-box:hover:not(.dragover) {
+            background-color: rgba(59, 130, 246, 0.08);
+            border-color: var(--azul-operativo);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Separadores Flex */
+        .section-header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--borde-color);
+            padding-bottom: 8px;
+        }
+
+        .btn-danger-outline {
+            background: transparent;
+            color: var(--alerta);
+            border: 1px solid var(--alerta);
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-danger-outline:hover:not(:disabled) {
+            background-color: var(--alerta);
+            color: var(--texto-principal);
+        }
+
+        .btn-danger-outline:disabled {
+            border-color: #27354a;
+            color: #475569;
+            cursor: not-allowed;
+        }
+
+        /* Lista de Archivos */
+        .file-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            background: var(--bg-tarjeta);
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--borde-color);
+            font-size: 13px;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 80%;
+        }
+
+        .thumbnail-container {
+            width: 38px;
+            height: 38px;
+            border-radius: 4px;
+            background-color: var(--bg-principal);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid var(--borde-color);
+            flex-shrink: 0;
+        }
+
+        .thumbnail-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .thumbnail-icon {
+            font-size: 9px;
+            font-weight: 700;
+        }
+        .icon-pdf { color: #f87171; }
+        .icon-doc { color: #60a5fa; }
+
+        .meta-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .badge-type {
+            font-size: 9px;
+            font-weight: 700;
+            color: #ffffff;
+            padding: 1px 6px;
+            border-radius: 3px;
+            width: fit-content;
+            text-transform: uppercase;
+        }
+        .badge-active { background-color: #1e3a8a; border: 1px solid #3b82f6; }
+        .badge-alert { background-color: #7f1d1d; border: 1px solid #ef4444; }
+        .badge-warn { background-color: #78350f; border: 1px solid #f59e0b; }
+        
+        .btn-delete {
+            color: var(--texto-secundario);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-delete:hover {
+            color: var(--alerta);
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+        
+        /* Visor de la Derecha */
+        .viewer-box {
+            width: 100%;
+            flex: 1;
+            background-color: #0b111e;
+            border-radius: 6px;
+            border: 1px solid var(--borde-color);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .viewer-box iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .viewer-placeholder {
+            color: var(--texto-secundario);
+            font-style: italic;
+            font-size: 13px;
+            text-align: center;
+            padding: 30px;
+            line-height: 1.6;
+        }
+
+        /* Botón de Exportación */
+        .btn-primary {
+            display: block;
+            width: 100%;
+            background-color: var(--azul-institucional);
+            color: #ffffff;
+            border: none;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--azul-hover);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background-color: #1e293b;
+            color: #475569;
+            cursor: not-allowed;
+        }
+
+        #statusMessage {
+            margin-top: 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .success { color: var(--exito); }
+        .error { color: var(--alerta); }
+        .loading { color: var(--azul-operativo); }
+    </style>
+</head>
+<body>
+
+    <h1>LEGAJOS CASOS SAR</h1>
+
+    <div class="workspace">
+        
+        <div class="panel-left">
+            <div class="section-title">ARCHIVOS</div>
+            
+            <div class="upload-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" style="margin-bottom: 8px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+                <p style="margin: 0; font-weight: 600; font-size: 14px; color: var(--texto-principal);">Arrastre o seleccione los documentos</p>
+                <span style="font-size: 11px; color: var(--texto-secundario); display: block; margin-top: 4px;">PDF, Word (.docx), JPG o PNG</span>
+            </div>
+            
+            <input type="file" id="fileInput" multiple accept=".pdf, .jpg, .jpeg, .png, .docx, application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+
+            <!-- BLOQUE DE CHECKLIST AUTOMÁTICO DE COBERTURA -->
+            <div class="checklist-box">
+                <div class="checklist-title">📋 COBERTURA DE COMPONENTES REGLAMENTARIOS</div>
+                <div class="checklist-grid">
+                    <div class="checklist-item" id="chk-caratula"><span class="chk-indicator"></span>1. Carátula</div>
+                    <div class="checklist-item" id="chk-cronologia"><span class="chk-indicator"></span>2. Cronología</div>
+                    <div class="checklist-item" id="chk-caracteristicas"><span class="chk-indicator"></span>3. Caract. Buque</div>
+                    <div class="checklist-item" id="chk-ficha"><span class="chk-indicator"></span>4. Ficha Tripulante</div>
+                    <div class="checklist-item" id="chk-sitrep"><span class="chk-indicator"></span>5. SITREP</div>
+                    <div class="checklist-item" id="chk-informe"><span class="chk-indicator"></span>6. Informes</div>
+                    <div class="checklist-item" id="chk-sarmap"><span class="chk-indicator"></span>7. Áreas SARMAP</div>
+                    <div class="checklist-item" id="chk-medios"><span class="chk-indicator"></span>8. Medios SAR</div>
+                    <div class="checklist-item" id="chk-grafico"><span class="chk-indicator"></span>9. Gráficos</div>
+                    <div class="checklist-item" id="chk-preaviso"><span class="chk-indicator"></span>10. Preavisos</div>
+                    <div class="checklist-item" id="chk-aviso"><span class="chk-indicator"></span>11. Aviso Navegantes</div>
+                </div>
+            </div>
+
+            <div class="section-header-flex">
+                <h3 class="section-title" style="margin:0;">ESTRUCTURA</h3>
+                <button id="clearAllBtn" class="btn-danger-outline" disabled onclick="eliminarTodo()">Eliminar Todo</button>
+            </div>
+            
+            <ul id="fileList" class="file-list">
+                <li style="color: var(--texto-secundario); font-style: italic; font-size: 13px; text-align: center; padding: 20px;">No se registran componentes cargados en el sistema actual.</li>
+            </ul>
+        </div>
+
+        <div class="panel-right">
+            <div class="section-title">VISTA PREVIA</div>
+            
+            <div class="viewer-box" id="pdfViewerContainer">
+                <div class="viewer-placeholder" id="placeholderMsg">
+                    Añada elementos a la cola de archivos. El sistema compilará y desplegará de forma automática el documento oficial unificado en este cuadrante.
+                </div>
+            </div>
+
+            <button id="mergeBtn" class="btn-primary" disabled onclick="descargarLegajo()">Exportar Legajo Unificado</button>
+            <div id="statusMessage"></div>
+        </div>
+
+    </div>
+
+<script>
+    const LISTA_ORDEN_MAESTRO = [
+        { clave: "caratula", etiqueta: "1 - CARATULA", badge: "badge-active", chkId: "chk-caratula" },
+        { clave: "cronologia", etiqueta: "2 - CRONOLOGIA", badge: "badge-active", chkId: "chk-cronologia" },
+        { clave: "caracteristicas", etiqueta: "3 - CARACTERISTICAS DEL BUQUE", badge: "badge-active", chkId: "chk-caracteristicas" },
+        { clave: "ficha", etiqueta: "4 - FICHA DEL TRIPULANTE", badge: "badge-active", chkId: "chk-ficha" },
+        { clave: "sitrep", etiqueta: "5 - SITREP", badge: "badge-alert", chkId: "chk-sitrep" },
+        /* Se añade "if eccr" junto a "informe" para dar cumplimiento a la regla especial de escritura de informes */
+        { clave: ["informe", "if eccr"], etiqueta: "6 - INFORMES", badge: "badge-alert", chkId: "chk-informe" },
+        { clave: "sarmap", etiqueta: "7 - AREAS DE BUSQUEDA SARMAP", badge: "badge-warn", chkId: "chk-sarmap" },
+        { clave: "medios", etiqueta: "8 - MEDIOS SAR", badge: "badge-warn", chkId: "chk-medios" },
+        { clave: "grafico", etiqueta: "9 - GRAFICOS", badge: "badge-warn", chkId: "chk-grafico" },
+        { clave: "preaviso", etiqueta: "10 - PREAVISOS", badge: "badge-active", chkId: "chk-preaviso" },
+        { clave: "aviso a los navegantes", etiqueta: "11 - AVISO A LOS NAVEGANTES", badge: "badge-active", chkId: "chk-aviso" }
+    ];
+
+    let archivosLegajo = [];
+    let currentBlobUrl = null;
+
+    const fileInput = document.getElementById('fileInput');
+    const fileListHtml = document.getElementById('fileList');
+    const mergeBtn = document.getElementById('mergeBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const statusMessage = document.getElementById('statusMessage');
+    const dropZone = document.getElementById('dropZone');
+    const pdfViewerContainer = document.getElementById('pdfViewerContainer');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        procesarArchivos(Array.from(e.dataTransfer.files));
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        procesarArchivos(Array.from(e.target.files));
+        fileInput.value = '';
+    });
+
+    function procesarArchivos(files) {
+        const archivosValidos = files.filter(file => 
+            file.type === "application/pdf" || 
+            file.type.startsWith("image/") || 
+            file.name.endsWith('.pdf') || 
+            file.name.endsWith('.jpg') || 
+            file.name.endsWith('.jpeg') || 
+            file.name.endsWith('.png') ||
+            file.name.endsWith('.docx')
+        );
+
+        archivosValidos.forEach(file => {
+            if (!archivosLegajo.some(f => f.name === file.name && f.size === file.size)) {
+                file.thumbnailUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+                archivosLegajo.push(file);
+            }
+        });
+        
+        ordenarListaArchivos();
+        actualizarLista();
+        actualizarChecklist();
+        compilarParaVistaPrevia();
+    }
+
+    function obtenerPrioridadYInfo(nombreArchivo) {
+        const nombreNormalizado = nombreArchivo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+        for (let i = 0; i < LISTA_ORDEN_MAESTRO.length; i++) {
+            const claves = LISTA_ORDEN_MAESTRO[i].clave;
+            
+            // Evalúa si es un arreglo de claves (como en Informes) o una clave string simple
+            if (Array.isArray(claves)) {
+                if (claves.some(c => nombreNormalizado.includes(c))) {
+                    return { 
+                        indice: i, 
+                        etiqueta: LISTA_ORDEN_MAESTRO[i].etiqueta, 
+                        badge: LISTA_ORDEN_MAESTRO[i].badge,
+                        chkId: LISTA_ORDEN_MAESTRO[i].chkId 
+                    };
+                }
+            } else {
+                if (nombreNormalizado.includes(claves)) {
+                    return { 
+                        indice: i, 
+                        etiqueta: LISTA_ORDEN_MAESTRO[i].etiqueta, 
+                        badge: LISTA_ORDEN_MAESTRO[i].badge,
+                        chkId: LISTA_ORDEN_MAESTRO[i].chkId 
+                    };
+                }
+            }
+        }
+        return { indice: LISTA_ORDEN_MAESTRO.length, etiqueta: "DOCUMENTACIÓN ANEXA", badge: "badge-active", chkId: null };
+    }
+
+    function ordenarListaArchivos() {
+        archivosLegajo.sort((a, b) => {
+            let prioA = obtenerPrioridadYInfo(a.name).indice;
+            let prioB = obtenerPrioridadYInfo(b.name).indice;
+            if (prioA !== prioB) return prioA - prioB;
+            return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        });
+    }
+
+    // GESTIÓN DINÁMICA DEL CHECKLIST EN TIEMPO REAL
+    function actualizarChecklist() {
+        LISTA_ORDEN_MAESTRO.forEach(item => {
+            const el = document.getElementById(item.chkId);
+            if (el) el.classList.remove('ready');
+        });
+
+        archivosLegajo.forEach(archivo => {
+            const info = obtenerPrioridadYInfo(archivo.name);
+            if (info.chkId) {
+                const el = document.getElementById(info.chkId);
+                if (el) el.classList.add('ready');
+            }
+        });
+    }
+
+    function actualizarLista() {
+        fileListHtml.innerHTML = '';
+        
+        if (archivosLegajo.length === 0) {
+            fileListHtml.innerHTML = '<li style="color: var(--texto-secundario); font-style: italic; font-size: 13px; text-align: center; padding: 20px;">No se registran componentes cargados en el sistema actual.</li>';
+            mergeBtn.disabled = true;
+            clearAllBtn.disabled = true;
+            limpiarVisor();
+            return;
+        }
+
+        archivosLegajo.forEach((file, index) => {
+            let info = obtenerPrioridadYInfo(file.name);
+            let iconHtml = '';
+            
+            if (file.thumbnailUrl) {
+                iconHtml = `<img src="${file.thumbnailUrl}" alt="Thumb">`;
+            } else if (file.name.endsWith('.docx')) {
+                iconHtml = `<span class="thumbnail-icon icon-doc">WORD</span>`;
+            } else {
+                iconHtml = `<span class="thumbnail-icon icon-pdf">PDF</span>`;
+            }
+
+            const li = document.createElement('li');
+            li.className = 'file-item';
+            li.innerHTML = `
+                <div class="file-info">
+                    <div class="thumbnail-container">${iconHtml}</div>
+                    <div class="meta-text">
+                        <span class="badge-type ${info.badge}">${info.etiqueta}</span>
+                        <span style="font-weight: 500; color: var(--texto-principal); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 250px;" title="${file.name}">${file.name}</span>
+                        <small style="color: var(--texto-secundario);">Dimensión: (${ (file.size/1024/1024).toFixed(2) } MB)</small>
+                    </div>
+                </div>
+                <span class="btn-delete" onclick="eliminarArchivo(${index})">Remover</span>
+            `;
+            fileListHtml.appendChild(li);
+        });
+
+        mergeBtn.disabled = archivosLegajo.length < 1;
+        clearAllBtn.disabled = archivosLegajo.length < 1;
+    }
+
+    function eliminarArchivo(index) {
+        if (archivosLegajo[index].thumbnailUrl) URL.revokeObjectURL(archivosLegajo[index].thumbnailUrl);
+        archivosLegajo.splice(index, 1);
+        actualizarLista();
+        actualizarChecklist();
+        compilarParaVistaPrevia();
+    }
+
+    function eliminarTodo() {
+        if (confirm("¿Confirmar depuración de la cola de carga actual?")) {
+            archivosLegajo.forEach(file => { if (file.thumbnailUrl) URL.revokeObjectURL(file.thumbnailUrl); });
+            archivosLegajo = [];
+            actualizarLista();
+            actualizarChecklist();
+            statusMessage.innerHTML = '';
+        }
+    }
+
+    function limpiarVisor() {
+        if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+        pdfViewerContainer.innerHTML = `
+            <div class="viewer-placeholder" id="placeholderMsg">
+                Añada elementos a la cola de archivos. El sistema compilará y desplegará de forma automática el documento oficial unificado en este cuadrante.
+            </div>`;
+    }
+
+    async function transformarWordAPdfDocument(file) {
+        const buffer = await file.arrayBuffer();
+        const rawResult = await mammoth.extractRawText({ arrayBuffer: buffer });
+        const textoExtraido = rawResult.value;
+
+        const nuevoPdf = await PDFLib.PDFDocument.create();
+        let paginaActual = nuevoPdf.addPage([595.276, 841.89]);
+        const fuenteStd = await nuevoPdf.embedFont(PDFLib.StandardFonts.Helvetica);
+        
+        const { width, height } = paginaActual.getSize();
+        const lineasTexto = textoExtraido.split('\n');
+        let posicionY = height - 60;
+
+        paginaActual.drawText(`CONTENIDO ANEXADO (CONVERTIDO DE EXTRACCIÓN .DOCX) - ARCHIVO: ${file.name.toUpperCase()}`, {
+            x: 50, y: posicionY, size: 8, font: fuenteStd, color: PDFLib.rgb(0.5, 0.5, 0.5)
+        });
+        posicionY -= 35;
+
+        for (let linea of lineasTexto) {
+            if (linea.trim() === '') { posicionY -= 12; continue; }
+            if (posicionY < 55) {
+                paginaActual = nuevoPdf.addPage([595.276, 841.89]);
+                posicionY = height - 60;
+            }
+            paginaActual.drawText(linea.substring(0, 85), {
+                x: 50, y: posicionY, size: 10, font: fuenteStd, color: PDFLib.rgb(0.1, 0.1, 0.1)
+            });
+            posicionY -= 15;
+        }
+        return nuevoPdf;
+    }
+
+    async function compilarParaVistaPrevia() {
+        if (archivosLegajo.length === 0) return;
+
+        statusMessage.className = 'loading';
+        statusMessage.innerText = '⏳ Compilando y ordenando matriz de documentos institucionales...';
+
+        try {
+            const pdfUnificado = await PDFLib.PDFDocument.create();
+
+            for (const archivo of archivosLegajo) {
+                if (archivo.name.endsWith('.docx')) {
+                    const docWordConvertido = await transformarWordAPdfDocument(archivo);
+                    const paginasWord = await pdfUnificado.copyPages(docWordConvertido, docWordConvertido.getPageIndices());
+                    paginasWord.forEach(pag => pdfUnificado.addPage(pag));
+                } else if (archivo.type === "application/pdf" || archivo.name.endsWith('.pdf')) {
+                    const arrayBuffer = await archivo.arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                    const paginasCopiadas = await pdfUnificado.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                    paginasCopiadas.forEach((pagina) => pdfUnificado.addPage(pagina));
+                } else {
+                    const arrayBuffer = await archivo.arrayBuffer();
+                    let imagenIncrustada;
+                    if (archivo.type === "image/png" || archivo.name.endsWith('.png')) {
+                        imagenIncrustada = await pdfUnificado.embedPng(arrayBuffer);
+                    } else {
+                        imagenIncrustada = await pdfUnificado.embedJpg(arrayBuffer);
+                    }
+
+                    const paginaNueva = pdfUnificado.addPage([595.27, 841.89]);
+                    const { width, height } = paginaNueva.getSize();
+
+                    const escala = Math.min((width - 40) / imagenIncrustada.width, (height - 40) / imagenIncrustada.height);
+                    const anchoFinal = imagenIncrustada.width * escala;
+                    const altoFinal = imagenIncrustada.height * escala;
+
+                    paginaNueva.drawImage(imagenIncrustada, {
+                        x: (width - anchoFinal) / 2, y: (height - altoFinal) / 2, width: anchoFinal, height: altoFinal,
+                    });
+                }
+            }
+
+            const pdfBytes = await pdfUnificado.save();
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            
+            if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+            currentBlobUrl = URL.createObjectURL(blob);
+            
+            pdfViewerContainer.innerHTML = `<iframe src="${currentBlobUrl}#toolbar=1" title="Vista Previa"></iframe>`;
+            statusMessage.className = 'success';
+            statusMessage.innerText = '✅ Legajo institucional pre-compilado correctamente.';
+
+        } catch (error) {
+            console.error(error);
+            statusMessage.className = 'error';
+            statusMessage.innerText = '❌ Error crítico de procesamiento durante el montaje.';
+        }
+    }
+
+    function descargarLegajo() {
+        if (!currentBlobUrl) return;
+        const link = document.createElement('a');
+        link.href = currentBlobUrl;
+        link.download = `LEGAJO_SAR_UNIFICADO_${new Date().toISOString().slice(0,10)}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
